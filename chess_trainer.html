@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>♟ Chess Opening Coach</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0c0c0c;
+      background-image:
+        repeating-linear-gradient(45deg, transparent, transparent 60px, rgba(212,175,55,0.018) 60px, rgba(212,175,55,0.018) 120px),
+        radial-gradient(ellipse at 25% 15%, rgba(28,18,0,0.9) 0%, transparent 55%),
+        radial-gradient(ellipse at 75% 85%, rgba(8,8,18,0.9) 0%, transparent 55%);
+      color: #c8c0b0;
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    button { cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+    button:hover { opacity: 0.88; }
+    button:active { transform: translateY(1px); }
+    input:focus { outline: none; border-color: #d4af37 !important; box-shadow: 0 0 0 2px rgba(212,175,55,0.18) !important; }
+    @keyframes chessPulse {
+      0%,100% { opacity:1; transform: scale(1) rotate(0deg); }
+      30% { opacity:0.5; transform: scale(0.88) rotate(-8deg); }
+      70% { opacity:0.6; transform: scale(0.92) rotate(8deg); }
+    }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+    .pulse  { display:inline-block; animation: chessPulse 2.2s ease-in-out infinite; }
+    .fadein { animation: fadeIn 0.35s ease-out; }
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-track { background:#0c0c0c; }
+    ::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:3px; }
+    @media(max-width:580px) {
+      .level-grid { grid-template-columns:1fr 1fr !important; }
+      .color-row  { flex-direction:column !important; }
+      .input-row  { flex-direction:column !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const MODEL = 'claude-sonnet-4-5';
+
+const LEVELS = {
+  beginner:     { label:'Beginner',     sub:'< 1000',    desc:'a beginner (under 1000 Elo). Play simple, natural moves; make occasional blunders; avoid sharp or complex tactical lines.' },
+  intermediate: { label:'Intermediate', sub:'1000–1400', desc:'an intermediate player (1000–1400 Elo). Play solid fundamentals with basic tactical awareness; avoid obvious blunders.' },
+  club:         { label:'Club Player',  sub:'1400–1800', desc:'a strong club player (1400–1800 Elo). Demonstrate good positional understanding, punish opponent mistakes, use sound opening principles.' },
+  advanced:     { label:'Advanced',     sub:'1800+',     desc:'an advanced player (1800+ Elo). Play sharply and principally; exploit weaknesses; use precise opening theory.' },
+};
+
+const DECO = ['♔','♕','♖','♗','♘','♙','♚','♛','♜','♝','♞','♟'];
+
+// ── API ──────────────────────────────────────────────────────────────────────
+
+async function callClaude(system, userMsg, maxTokens) {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content: userMsg }],
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || `Server error ${res.status}`);
+  return data.content[0].text.trim();
+}
+
+const SAN_RE = /\b(0-0-0|0-0|O-O-O|O-O|[KQRBN][a-h1-8]?x?[a-h][1-8](?:=[KQRBN])?[+#]?|[a-h]x[a-h][1-8](?:=[KQRBN])?[+#]?|[a-h][1-8](?:=[KQRBN])?[+#]?)\b/;
+
+function extractMove(raw) {
+  // Scan every line — return the first valid SAN hit, never garbage text
+  for (const line of raw.trim().split('\n')) {
+    const m = line.match(SAN_RE);
+    if (m) return m[1];
+  }
+  return '?';
+}
+
+function formatPGN(moves) {
+  return moves.map((m,i) => `${i+1}. ${m.w}${m.b ? ' '+m.b : ''}`).join('  ');
+}
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+
+const S = {
+  page:     { maxWidth:740, margin:'0 auto', padding:'28px 16px 60px' },
+  centered: { display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh' },
+
+  serif: (sz, w=600, col='#d4af37') => ({ fontFamily:"'Playfair Display',serif", fontSize:sz, fontWeight:w, color:col }),
+  mono:  (sz, col='#c8c0b0')        => ({ fontFamily:"'JetBrains Mono',monospace", fontSize:sz, color:col }),
+
+  header:    { textAlign:'center', marginBottom:36 },
+  decoRow:   { display:'flex', justifyContent:'center', gap:14, marginBottom:12, opacity:0.35 },
+  decoPiece: { fontSize:18, color:'#d4af37' },
+
+  card: (extra={}) => ({ background:'#141414', border:'1px solid #252525', borderRadius:12, padding:'28px 24px', ...extra }),
+
+  formGroup: { display:'flex', flexDirection:'column', gap:10 },
+
+  levelGrid: { display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 },
+  levelBtn: (active) => ({
+    background: active ? '#1a1400' : '#0e0e0e',
+    border: `1px solid ${active ? '#d4af37' : '#222'}`,
+    borderRadius:9, padding:'13px 15px', cursor:'pointer', textAlign:'left', transition:'all 0.15s',
+  }),
+
+  colorRow: { display:'flex', gap:12 },
+  colorBtn: (active, isWhite) => ({
+    flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:6,
+    padding:'18px 12px', borderRadius:9, cursor:'pointer',
+    border: `2px solid ${active ? '#d4af37' : 'transparent'}`,
+    background: active ? '#1a1400' : (isWhite ? '#151515' : '#0e0e0e'),
+    transition:'all 0.15s',
+  }),
+
+  slider:    { width:'100%', accentColor:'#d4af37', cursor:'pointer' },
+  sliderRow: { display:'flex', justifyContent:'space-between', fontSize:11, color:'#3a3530', marginTop:4 },
+
+  goldBtn: (sm=false) => ({
+    background:'linear-gradient(135deg,#d4af37 0%,#a07820 100%)',
+    color:'#0a0a0a', border:'none', borderRadius:8,
+    padding: sm ? '10px 22px' : '15px 36px',
+    fontSize: sm ? 13 : 15, fontWeight:700,
+    fontFamily:"'Playfair Display',serif", letterSpacing:'0.04em',
+  }),
+
+  gameBar: { display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10, marginBottom:22 },
+  badge:   { background:'#111', border:'1px solid #222', borderRadius:20, padding:'4px 13px', fontSize:11, color:'#7a7060', fontFamily:"'JetBrains Mono',monospace" },
+
+  th:  { textAlign:'left', color:'#3a3530', fontSize:10, textTransform:'uppercase', letterSpacing:'0.1em', paddingBottom:8, borderBottom:'1px solid #1e1e1e' },
+  tdN: { color:'#2e2e2e', padding:'5px 6px 5px 0', width:28, fontFamily:"'JetBrains Mono',monospace", fontSize:13 },
+  tdM: (user) => ({ padding:'5px 10px', fontFamily:"'JetBrains Mono',monospace", fontSize:14, fontWeight:500, color: user ? '#d4af37' : '#9a9080' }),
+
+  callout:   { background:'#120f00', border:'1px solid rgba(212,175,55,0.3)', borderRadius:9, padding:'14px 20px', marginBottom:18, display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' },
+
+  inputRow:  { display:'flex', gap:10 },
+  moveInput: { flex:1, background:'#0a0a0a', border:'1px solid #2a2a2a', borderRadius:8, padding:'13px 16px', color:'#e0d8c8', fontSize:16, fontFamily:"'JetBrains Mono',monospace" },
+  submitBtn: { background:'#d4af37', color:'#0a0a0a', border:'none', borderRadius:8, padding:'13px 22px', fontSize:15, fontWeight:700, fontFamily:"'JetBrains Mono',monospace" },
+  errText:      { color:'#aa3333', fontSize:12, fontFamily:"'JetBrains Mono',monospace", marginTop:4 },
+  rulingBtn:    { background:'transparent', border:'1px solid rgba(170,60,60,0.45)', borderRadius:7, padding:'5px 13px', fontSize:11, color:'#aa6060', fontFamily:"'JetBrains Mono',monospace", letterSpacing:'0.03em', marginTop:6, display:'inline-block' },
+  rulingPanel:  { background:'#0d0000', border:'1px solid rgba(180,60,60,0.28)', borderRadius:9, padding:'14px 16px', marginTop:8, display:'flex', flexDirection:'column', gap:10 },
+  rulingUphold: { background:'#0d0000', border:'1px solid rgba(180,60,60,0.3)', borderRadius:8, padding:'11px 16px', marginBottom:14, fontSize:12, color:'#cc6060', fontFamily:"'JetBrains Mono',monospace", lineHeight:1.6 },
+
+  restartBtn:   { background:'transparent', border:'1px solid #2e2a24', borderRadius:8, padding:'7px 16px', fontSize:12, color:'#6a6050', fontFamily:"'JetBrains Mono',monospace", letterSpacing:'0.03em' },
+  challengeBtn: { background:'transparent', border:'1px solid rgba(212,175,55,0.35)', borderRadius:7, padding:'5px 13px', fontSize:11, color:'#a08830', fontFamily:"'JetBrains Mono',monospace", letterSpacing:'0.03em', whiteSpace:'nowrap' },
+  challengeOk:  { background:'#0a1200', border:'1px solid rgba(80,160,60,0.3)', borderRadius:8, padding:'11px 16px', marginBottom:14, fontSize:12, color:'#70b060', fontFamily:"'JetBrains Mono',monospace", lineHeight:1.6 },
+  challengeFix: { background:'#130a00', border:'1px solid rgba(212,175,55,0.35)', borderRadius:8, padding:'11px 16px', marginBottom:14, fontSize:12, color:'#c8a030', fontFamily:"'JetBrains Mono',monospace", lineHeight:1.6 },
+  challengePanel: { background:'#0d0c00', border:'1px solid rgba(212,175,55,0.25)', borderRadius:9, padding:'14px 16px', marginBottom:14, display:'flex', flexDirection:'column', gap:10 },
+  challengeTextarea: { background:'#0a0a0a', border:'1px solid #2a2a2a', borderRadius:7, padding:'10px 13px', color:'#e0d8c8', fontSize:13, fontFamily:"'JetBrains Mono',monospace", resize:'vertical', minHeight:72, lineHeight:1.6 },
+  challengeSubmit: { background:'linear-gradient(135deg,#a08420 0%,#7a6010 100%)', color:'#f0e8c8', border:'none', borderRadius:7, padding:'9px 20px', fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace" },
+  challengeCancel: { background:'transparent', border:'1px solid #2a2a2a', borderRadius:7, padding:'9px 16px', fontSize:12, color:'#5a5040', fontFamily:"'JetBrains Mono',monospace" },
+
+  loadWrap:  { textAlign:'center', padding:'60px 20px' },
+  loadPiece: { fontSize:64, marginBottom:22, lineHeight:1 },
+  loadText:  { fontFamily:"'Playfair Display',serif", fontStyle:'italic', fontSize:17, color:'#7a7060' },
+
+  reportCard: { background:'#111', border:'1px solid #222', borderRadius:13, padding:'36px 28px', marginBottom:28, lineHeight:1.85 },
+  rH2: { fontFamily:"'Playfair Display',serif", fontSize:20, color:'#d4af37', marginBottom:10, marginTop:4, borderBottom:'1px solid #1e1e1e', paddingBottom:8 },
+  rH3: { fontFamily:"'Playfair Display',serif", fontSize:17, color:'#c8a030', marginBottom:6, marginTop:18 },
+  rP:  { color:'#b8b0a0', fontSize:14, marginBottom:9, lineHeight:1.85 },
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function renderReport(text) {
+  return text.split('\n').map((line, i) => {
+    const t = line.trim();
+    if (!t) return <div key={i} style={{height:8}} />;
+    if (t.startsWith('## ') || t.startsWith('# '))  return <h2 key={i} style={S.rH2}>{t.replace(/^#+ /, '')}</h2>;
+    if (t.startsWith('### '))                        return <h3 key={i} style={S.rH3}>{t.replace(/^### /, '')}</h3>;
+    const parts = t.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <p key={i} style={S.rP}>
+        {parts.map((p,j) =>
+          p.startsWith('**') && p.endsWith('**')
+            ? <strong key={j} style={{color:'#d4af37', fontWeight:600}}>{p.slice(2,-2)}</strong>
+            : p
+        )}
+      </p>
+    );
+  });
+}
+
+// ── Components ────────────────────────────────────────────────────────────────
+
+function Loading({ msg }) {
+  const [dots, setDots] = useState('');
+  useEffect(() => {
+    const t = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 450);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div style={S.centered}>
+      <div style={S.loadWrap} className="fadein">
+        <div style={S.loadPiece} className="pulse">♞</div>
+        <p style={S.loadText}>{msg}{dots}</p>
+      </div>
+    </div>
+  );
+}
+
+function Setup({ onStart }) {
+  const [level,     setLevel] = useState('intermediate');
+  const [color,     setColor] = useState('white');
+  const [moveCount, setCount] = useState(10);
+
+  return (
+    <div style={S.page} className="fadein">
+      <header style={S.header}>
+        <div style={S.decoRow}>{DECO.slice(0,6).map((p,i)=><span key={i} style={S.decoPiece}>{p}</span>)}</div>
+        <h1 style={{...S.serif('clamp(30px,5vw,50px)',700,'#d4af37'), letterSpacing:'0.02em', marginBottom:8}}>Chess Opening Coach</h1>
+        <p style={{...S.serif(15,400,'#7a7060'), fontStyle:'italic'}}>Play on your board. Report your moves. Receive expert coaching.</p>
+      </header>
+
+      <div style={{...S.card(), display:'flex', flexDirection:'column', gap:26}}>
+
+        {/* Skill Level */}
+        <div style={S.formGroup}>
+          <label style={S.serif(15)}>Opponent Skill Level</label>
+          <div style={S.levelGrid} className="level-grid">
+            {Object.entries(LEVELS).map(([k,v]) => (
+              <button key={k} onClick={()=>setLevel(k)} style={S.levelBtn(level===k)}>
+                <span style={S.serif(14,600, level===k ? '#d4af37' : '#8a8070')}>{v.label}</span>
+                <span style={{...S.mono(11, level===k ? '#d4af37' : '#484030'), opacity:0.8, marginTop:2}}>{v.sub}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Color */}
+        <div style={S.formGroup}>
+          <label style={S.serif(15)}>Play As</label>
+          <div style={S.colorRow} className="color-row">
+            {[['white','♔','White'],['black','♚','Black']].map(([val,piece,name])=>(
+              <button key={val} onClick={()=>setColor(val)} style={S.colorBtn(color===val, val==='white')}>
+                <span style={{fontSize:30, color: color===val ? '#d4af37' : (val==='white' ? '#e0d8c8' : '#6a6050')}}>{piece}</span>
+                <span style={S.serif(13,600, color===val ? '#d4af37' : '#6a6050')}>{name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Move Count */}
+        <div style={S.formGroup}>
+          <label style={S.serif(15)}>
+            Moves to Play —&nbsp;<span style={{color:'#d4af37'}}>{moveCount}</span>
+          </label>
+          <input type="range" min="5" max="10" value={moveCount}
+            onChange={e=>setCount(Number(e.target.value))} style={S.slider} />
+          <div style={S.sliderRow}>{[5,6,7,8,9,10].map(n=><span key={n}>{n}</span>)}</div>
+        </div>
+
+        <button onClick={()=>onStart({level,color,moveCount})} style={S.goldBtn()}>
+          ♟ &nbsp;Start Game
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Game({ moves, settings, onMove, error, onRestart, onChallenge, challengeResult, illegalMove, onChallengeRuling }) {
+  const [input,          setInput]          = useState('');
+  const [challengeOpen,  setChallengeOpen]  = useState(false);
+  const [challengeText,  setChallengeText]  = useState('');
+  const [rulingOpen,     setRulingOpen]     = useState(false);
+  const [rulingText,     setRulingText]     = useState('');
+  const inputRef     = useRef();
+  const challengeRef = useRef();
+  const rulingRef    = useRef();
+
+  // Re-focus move input after moves change; close both panels
+  useEffect(() => {
+    setChallengeOpen(false);  setChallengeText('');
+    setRulingOpen(false);     setRulingText('');
+    inputRef.current?.focus();
+  }, [moves.length]);
+
+  // Close ruling panel when the illegal move is cleared externally
+  useEffect(() => {
+    if (!illegalMove) { setRulingOpen(false); setRulingText(''); }
+  }, [illegalMove]);
+
+  // Focus relevant textarea when panels open
+  useEffect(() => { if (challengeOpen) challengeRef.current?.focus(); }, [challengeOpen]);
+  useEffect(() => { if (rulingOpen)    rulingRef.current?.focus();    }, [rulingOpen]);
+
+  function openChallenge()   { setChallengeOpen(true); }
+  function cancelChallenge() { setChallengeOpen(false); setChallengeText(''); }
+  function submitChallenge() {
+    const txt = challengeText.trim();
+    setChallengeOpen(false); setChallengeText('');
+    onChallenge(txt);
+  }
+
+  function openRuling()    { setRulingOpen(true); }
+  function cancelRuling()  { setRulingOpen(false); setRulingText(''); }
+  function submitRuling()  {
+    const txt = rulingText.trim();
+    setRulingOpen(false); setRulingText('');
+    onChallengeRuling(txt);
+  }
+
+  const userMovesMade = settings.color === 'white'
+    ? moves.length
+    : moves.filter(m => m.b).length;
+
+  const opMove = (() => {
+    if (!moves.length) return null;
+    const last = moves[moves.length-1];
+    if (settings.color === 'white' && last.b) return last.b;
+    if (settings.color === 'black' && last.w && !last.b) return last.w;
+    return null;
+  })();
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    const mv = input.trim();
+    if (mv) { onMove(mv); setInput(''); }
+  };
+
+  return (
+    <div style={S.page} className="fadein">
+      <div style={S.gameBar}>
+        <h2 style={S.serif(22)}>Opening Game</h2>
+        <div style={{display:'flex', gap:8, flexWrap:'wrap', alignItems:'center'}}>
+          <span style={S.badge}>{LEVELS[settings.level].label}</span>
+          <span style={S.badge}>{settings.color === 'white' ? '♔ White' : '♚ Black'}</span>
+          <span style={S.badge}>Move {Math.min(userMovesMade+1, settings.moveCount)} of {settings.moveCount}</span>
+          <button onClick={onRestart} style={S.restartBtn} title="Abandon this game and return to setup">↺ Restart</button>
+        </div>
+      </div>
+
+      {/* Move history */}
+      <div style={{...S.card({padding:'20px 22px', marginBottom:18})}}>
+        <p style={{...S.mono(10,'#3a3530'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:14}}>Game Record</p>
+        {moves.length === 0
+          ? <p style={{...S.mono(13,'#2e2828'), fontStyle:'italic', textAlign:'center', padding:'12px 0'}}>Awaiting first move…</p>
+          : <table style={{width:'100%', borderCollapse:'collapse'}}>
+              <thead>
+                <tr>
+                  <th style={S.th}>#</th>
+                  <th style={S.th}>♔ White</th>
+                  <th style={S.th}>♚ Black</th>
+                </tr>
+              </thead>
+              <tbody>
+                {moves.map((m,i) => (
+                  <tr key={i} style={{borderBottom:'1px solid #181818'}}>
+                    <td style={S.tdN}>{i+1}.</td>
+                    <td style={S.tdM(settings.color==='white')}>{m.w || '—'}</td>
+                    <td style={S.tdM(settings.color==='black')}>{m.b || (i===moves.length-1 ? '…' : '—')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+        }
+      </div>
+
+      {/* Challenge result banner */}
+      {challengeResult && (
+        <div style={S.challengeOk}>
+          ✓ <strong>Move verified — {challengeResult.move}</strong><br/>
+          <span style={{opacity:0.85, lineHeight:1.7, display:'block', marginTop:4}}>{challengeResult.reason}</span>
+        </div>
+      )}
+
+      {/* Opponent's move callout + challenge panel */}
+      {opMove && (
+        <>
+          <div style={S.callout}>
+            <span style={S.mono(12,'#7a7060')}>Opponent plays:</span>
+            <span style={{...S.mono(22,'#d4af37'), fontWeight:700, letterSpacing:'0.05em'}}>{opMove}</span>
+            <span style={{...S.mono(11,'#484030'), fontStyle:'italic', flex:1}}>— make this move on your board</span>
+            {!challengeOpen && (
+              <button onClick={openChallenge} style={S.challengeBtn}
+                title="Report this move as illegal and explain why">⚑ Challenge Move</button>
+            )}
+          </div>
+
+          {challengeOpen && (
+            <div style={S.challengePanel}>
+              <label style={{...S.mono(11,'#7a7060'), textTransform:'uppercase', letterSpacing:'0.08em'}}>
+                Why do you think <span style={{color:'#d4af37'}}>{opMove}</span> is illegal?
+              </label>
+              <textarea
+                ref={challengeRef}
+                value={challengeText}
+                onChange={e => setChallengeText(e.target.value)}
+                placeholder={`e.g. "Your bishop was on c1 and there's a pawn blocking on d2" — or leave blank to let the engine self-check`}
+                style={S.challengeTextarea}
+              />
+              <div style={{display:'flex', gap:8}}>
+                <button onClick={submitChallenge} style={S.challengeSubmit}>⚑ Submit Challenge</button>
+                <button onClick={cancelChallenge} style={S.challengeCancel}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Input */}
+      <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:8}}>
+        <div style={S.inputRow} className="input-row">
+          <input
+            ref={inputRef}
+            type="text" value={input} onChange={e=>setInput(e.target.value)}
+            placeholder={`Your move as ${settings.color==='white'?'White':'Black'} — e.g. e4, Nf3, O-O`}
+            style={S.moveInput}
+          />
+          <button type="submit" style={S.submitBtn} disabled={!input.trim()}>Submit →</button>
+        </div>
+        {error && (
+          <div>
+            <p style={S.errText}>⚠ {error}</p>
+            {illegalMove && !rulingOpen && (
+              <button onClick={openRuling} style={S.rulingBtn}>
+                ⚑ Challenge this ruling
+              </button>
+            )}
+            {rulingOpen && (
+              <div style={S.rulingPanel}>
+                <label style={{...S.mono(11,'#aa6060'), textTransform:'uppercase', letterSpacing:'0.08em'}}>
+                  Why do you think <span style={{color:'#dd8888'}}>"{illegalMove}"</span> is legal?
+                </label>
+                <textarea
+                  ref={rulingRef}
+                  value={rulingText}
+                  onChange={e => setRulingText(e.target.value)}
+                  placeholder={`e.g. "My knight is on e4 and can jump to d6" — or leave blank to ask Claude to re-examine the position`}
+                  style={S.challengeTextarea}
+                />
+                <div style={{display:'flex', gap:8}}>
+                  <button onClick={submitRuling} style={{...S.challengeSubmit, background:'linear-gradient(135deg,#902020 0%,#6a1010 100%)'}}>⚑ Submit Challenge</button>
+                  <button onClick={cancelRuling} style={S.challengeCancel}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function Report({ report, moves, settings, onNewGame }) {
+  return (
+    <div style={S.page} className="fadein">
+      <header style={S.header}>
+        <div style={S.decoRow}>{DECO.slice(6).map((p,i)=><span key={i} style={S.decoPiece}>{p}</span>)}</div>
+        <h1 style={{...S.serif('clamp(26px,4vw,42px)',700,'#d4af37'), letterSpacing:'0.02em', marginBottom:8}}>Coaching Report</h1>
+        <p style={S.mono(12,'#6a6050')}>
+          {LEVELS[settings.level].label} &nbsp;·&nbsp; {settings.color==='white'?'White':'Black'} &nbsp;·&nbsp; {settings.moveCount} moves
+        </p>
+      </header>
+
+      {/* PGN */}
+      <div style={{...S.card({padding:'16px 20px', marginBottom:18})}}>
+        <p style={{...S.mono(10,'#3a3530'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>Game Record</p>
+        <p style={{...S.mono(13,'#7a7060'), lineHeight:1.7, wordBreak:'break-all'}}>{formatPGN(moves)}</p>
+      </div>
+
+      {/* Report body */}
+      <div style={S.reportCard}>{renderReport(report)}</div>
+
+      <div style={{display:'flex', justifyContent:'center', paddingBottom:20}}>
+        <button onClick={onNewGame} style={S.goldBtn()}>♟ &nbsp;New Game</button>
+      </div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+
+function App() {
+  const [phase,           setPhase]           = useState('setup');
+  const [settings,        setSettings]        = useState(null);
+  const [moves,           setMoves]           = useState([]);
+  const [error,           setError]           = useState('');
+  const [report,          setReport]          = useState('');
+  const [loadMsg,         setLoadMsg]         = useState('');
+  const [challengeResult, setChallengeResult] = useState(null);
+  const [illegalMove,     setIllegalMove]     = useState(null);   // move text rejected by chess.js
+
+  // chess.js instance — single source of truth for board legality
+  const chessRef = useRef(null);
+  if (!chessRef.current) chessRef.current = new Chess();
+
+  const moveSysPrompt = (color, levelKey) =>
+    `You are a chess player competing at ${LEVELS[levelKey].desc} You are playing as ${color}. ` +
+    `Replay the PGN mentally, verify your chosen move is legal (piece on source square, path clear, king safe), ` +
+    `then reply with EXACTLY one line and nothing else:\n` +
+    `MOVE: [your legal move in standard algebraic notation]`;
+
+  const moveUserMsg = (pgn, color) =>
+    pgn ? `Game so far (PGN): ${pgn}\n\nYou are ${color}. What is your move?`
+        : `You are ${color}. The game is just starting. What is your first move?`;
+
+  function handleRestart() {
+    setPhase('setup');
+    setMoves([]);
+    setError('');
+    setReport('');
+    setChallengeResult(null);
+    setIllegalMove(null);
+    chessRef.current = new Chess();
+  }
+
+  async function handleChallenge(userExplanation) {
+    const chess     = chessRef.current;
+    const last      = moves[moves.length - 1];
+    const contested = settings.color === 'white' ? last.b : last.w;
+    const opColor   = settings.color === 'white' ? 'Black' : 'White';
+    const pgn       = formatPGN(moves);
+
+    // Capture the exact board state before the challenged move
+    chess.undo();
+    const fenBefore = chess.fen();
+    chess.move(contested, { sloppy: true });   // restore
+
+    setLoadMsg("Verifying opponent's move…");
+    setPhase('loading');
+
+    const system =
+      `You are a precise chess analyst explaining a specific move to a player. ` +
+      `A certified chess rules engine has already confirmed this move is legal — your job is NOT to re-judge legality but to ` +
+      `explain clearly and specifically WHY it is legal, using the exact board position provided. ` +
+      `Address the player's stated concern directly. ` +
+      `Cite the piece's source square from the FEN, its movement rule, and why the destination is reachable. ` +
+      `Respond in EXACTLY this format:\n` +
+      `STATUS: LEGAL\n` +
+      `MOVE: [the SAN move]\n` +
+      `REASON: [clear 2–3 sentence explanation grounded in the actual board position]`;
+
+    const concern = userExplanation
+      ? `Player's concern: "${userExplanation}"`
+      : `The player is questioning whether this move is legal.`;
+
+    const userMsg =
+      `Board position immediately BEFORE the move (FEN): ${fenBefore}\n` +
+      `Move played by ${opColor}: ${contested}\n` +
+      `Full game PGN for context: ${pgn}\n\n` +
+      `${concern}\n\n` +
+      `Using the FEN above, identify the piece's source square and explain why ${contested} is valid.`;
+
+    try {
+      const raw         = await callClaude(system, userMsg, 250);
+      // Grab everything after REASON: (may be multi-sentence)
+      const reasonMatch = raw.match(/REASON:\s*([\s\S]+)$/i);
+      const reason      = reasonMatch ? reasonMatch[1].trim() : raw;
+      setChallengeResult({ type: 'legal', move: contested, reason });
+      setPhase('playing');
+    } catch(e) {
+      setError(e.message);
+      setPhase('playing');
+    }
+  }
+
+  async function opponentMove(currentMoves, color, levelKey) {
+    const chess = chessRef.current;
+    const pgn   = formatPGN(currentMoves);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const legalHint = attempt > 0
+        ? `\n\nIMPORTANT: Your previous suggestion was not a legal move in this position. ` +
+          `Legal moves available right now: ${chess.moves().slice(0, 15).join(', ')}. Choose one of these.`
+        : '';
+      const raw    = await callClaude(moveSysPrompt(color, levelKey), moveUserMsg(pgn, color) + legalHint, 150);
+      const tagged = raw.match(/MOVE:\s*([^\n]+)/i);
+      const candidate = extractMove(tagged ? tagged[1].trim() : raw);
+      const result = chess.move(candidate, { sloppy: true });
+      if (result) return result.san;   // chess.js validated — return normalised SAN
+    }
+
+    // All attempts failed — fall back to a random legal move
+    const legal = chess.moves();
+    const pick  = legal[Math.floor(Math.random() * legal.length)];
+    chess.move(pick);
+    return pick;
+  }
+
+  async function handleStart(cfg) {
+    setSettings(cfg);
+    setMoves([]);
+    setError('');
+    setReport('');
+    chessRef.current = new Chess();   // fresh board for every new game
+
+    if (cfg.color === 'black') {
+      setLoadMsg("White is making the first move…");
+      setPhase('loading');
+      try {
+        const mv = await opponentMove([], 'White', cfg.level);
+        setMoves([{ w: mv, b: '' }]);
+        setPhase('playing');
+      } catch(e) { setError(e.message); setPhase('setup'); }
+    } else {
+      setPhase('playing');
+    }
+  }
+
+  // Shared logic for after a user move has been validated by chess.js
+  async function playValidatedMove(san) {
+    if (settings.color === 'white') {
+      const nm = [...moves, { w: san, b: '' }];
+      setMoves(nm);
+      if (nm.length >= settings.moveCount) { await generateReport(nm); return; }
+      setLoadMsg("Opponent is thinking…"); setPhase('loading');
+      try {
+        const mv = await opponentMove(nm, 'Black', settings.level);
+        setMoves(nm.map((m,i) => i === nm.length-1 ? {...m, b: mv} : m));
+        setPhase('playing');
+      } catch(e) { setError(e.message); setPhase('playing'); }
+    } else {
+      const nm = moves.map((m,i) => i === moves.length-1 ? {...m, b: san} : m);
+      setMoves(nm);
+      const userCount = nm.filter(m => m.b).length;
+      if (userCount >= settings.moveCount) { await generateReport(nm); return; }
+      setLoadMsg("Opponent is thinking…"); setPhase('loading');
+      try {
+        const mv = await opponentMove(nm, 'White', settings.level);
+        setMoves([...nm, { w: mv, b: '' }]);
+        setPhase('playing');
+      } catch(e) { setError(e.message); setPhase('playing'); }
+    }
+  }
+
+  async function handleMove(userMove) {
+    setError('');
+    setChallengeResult(null);
+    setIllegalMove(null);
+
+    const chess      = chessRef.current;
+    const moveResult = chess.move(userMove, { sloppy: true });
+    if (!moveResult) {
+      setError(`"${userMove}" is not a legal move in this position.`);
+      setIllegalMove(userMove);
+      return;
+    }
+    await playValidatedMove(moveResult.san);
+  }
+
+  async function handleChallengeRuling(explanation) {
+    const chess    = chessRef.current;
+    const fen      = chess.fen();
+    const attempted = illegalMove;
+
+    setIllegalMove(null);
+    setError('');
+    setLoadMsg('Reviewing your move…');
+    setPhase('loading');
+
+    const system =
+      `You are a chess referee. A rules engine has flagged a player's move as illegal, but the player is challenging that ruling. ` +
+      `Study the board position (provided as FEN) carefully and determine whether the attempted move, ` +
+      `or a close variant with corrected notation, is actually legal. ` +
+      `Common notation issues: missing disambiguation (e.g. "Nf3" when "Ngf3" is needed), ` +
+      `incorrect capture symbol, or minor formatting differences. ` +
+      `If the move or a corrected form of it IS legal, provide the exact correct SAN. ` +
+      `If it is genuinely illegal, explain precisely why. ` +
+      `Respond in EXACTLY this format:\n` +
+      `STATUS: LEGAL or ILLEGAL\n` +
+      `MOVE: [correct SAN if legal, or the attempted move if illegal]\n` +
+      `REASON: [clear explanation citing the piece's source square and the rule that applies]`;
+
+    const concern = explanation
+      ? `Player's argument: "${explanation}"`
+      : `The player believes this move is legal.`;
+
+    const userMsg =
+      `Current board position (FEN): ${fen}\n` +
+      `Full game so far (PGN): ${formatPGN(moves)}\n` +
+      `Attempted move: ${attempted}\n` +
+      `${concern}\n\n` +
+      `Is "${attempted}" (or a correctly-notated equivalent) legal from this position?`;
+
+    try {
+      const raw         = await callClaude(system, userMsg, 250);
+      const statusMatch = raw.match(/STATUS:\s*(LEGAL|ILLEGAL)/i);
+      const moveMatch   = raw.match(/MOVE:\s*([^\n]+)/i);
+      const reasonMatch = raw.match(/REASON:\s*([\s\S]+)$/i);
+
+      const status    = statusMatch ? statusMatch[1].toUpperCase() : 'ILLEGAL';
+      const suggested = moveMatch   ? extractMove(moveMatch[1].trim()) : attempted;
+      const reason    = reasonMatch ? reasonMatch[1].trim() : raw;
+
+      if (status === 'LEGAL') {
+        const result = chess.move(suggested, { sloppy: true });
+        if (result) {
+          // Ruling overturned — play the move
+          await playValidatedMove(result.san);
+          return;
+        }
+        // Claude said legal but chess.js still disagrees — show the suggestion
+        setError(`Ruling upheld. Claude suggests the notation "${suggested}" but it still cannot be validated. ` +
+                 `Try retyping with full disambiguation (e.g. Ngf3, N1f3). ${reason}`);
+        setIllegalMove(attempted);
+      } else {
+        // Ruling upheld — keep illegalMove set so the player can challenge again
+        setError(`Ruling upheld: ${reason}`);
+        setIllegalMove(attempted);
+      }
+      setPhase('playing');
+    } catch(e) {
+      setError(e.message);
+      setPhase('playing');
+    }
+  }
+
+  async function generateReport(finalMoves) {
+    setLoadMsg("Analysing your game…"); setPhase('generating');
+
+    const pgn       = formatPGN(finalMoves);
+    const yourColor = settings.color === 'white' ? 'White' : 'Black';
+    const yourMoves = settings.color === 'white'
+      ? finalMoves.map((m,i) => `${i+1}. ${m.w}`).join('  ')
+      : finalMoves.filter(m=>m.b).map((m,i) => `${i+1}... ${m.b}`).join('  ');
+
+    const system =
+      `You are a world-class chess coach providing detailed post-game opening analysis. ` +
+      `Write as a personal, experienced coach giving thorough written feedback. ` +
+      `Be specific about chess principles, naming openings and ideas where appropriate. ` +
+      `Calibrate your language and depth to the player's stated skill level.`;
+
+    const userMsg =
+      `Please write a coaching report for this chess opening.\n\n` +
+      `Player colour: ${yourColor}\nSkill level: ${LEVELS[settings.level].label}\n` +
+      `Full game: ${pgn}\nPlayer's moves: ${yourMoves}\n\n` +
+      `Structure your report with these sections:\n` +
+      `## Move-by-Move Analysis\nComment on each of the player's moves — what principles were applied or violated, alternatives worth knowing.\n\n` +
+      `## Opening Strategy Assessment\nOverall evaluation: did they follow sound opening principles? Which opening was played?\n\n` +
+      `## Key Mistakes & Missed Opportunities\nThe most important moments where a better choice was available.\n\n` +
+      `## Improvement Recommendations\nConcrete, level-appropriate study advice and ideas to work on.\n\n` +
+      `## Performance Score\nRate the player 1–100 and explain the score in 2–3 sentences.\n\n` +
+      `Write in an engaging personal coaching voice. Be honest and encouraging.`;
+
+    try {
+      const txt = await callClaude(system, userMsg, 4096);
+      setReport(txt);
+      setPhase('report');
+    } catch(e) {
+      setError(e.message);
+      setPhase('playing');
+    }
+  }
+
+  if (phase === 'setup')                             return <Setup onStart={handleStart} />;
+  if (phase === 'loading' || phase === 'generating') return <Loading msg={loadMsg} />;
+  if (phase === 'playing')                           return <Game moves={moves} settings={settings} onMove={handleMove} error={error} onRestart={handleRestart} onChallenge={handleChallenge} challengeResult={challengeResult} illegalMove={illegalMove} onChallengeRuling={handleChallengeRuling} />;
+  if (phase === 'report')                            return <Report report={report} moves={moves} settings={settings} onNewGame={()=>setPhase('setup')} />;
+  return null;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
