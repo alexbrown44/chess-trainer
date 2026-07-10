@@ -14,6 +14,10 @@ if (!APIKEY) {
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'chess_trainer.html'));
+});
+
 // Max 30 API calls per IP per hour
 app.use('/api/chat', rateLimit({
   windowMs: 60 * 60 * 1000,
