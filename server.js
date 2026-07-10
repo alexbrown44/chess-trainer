@@ -1,8 +1,9 @@
-const express = require('express');
-const path    = require('path');
+const express   = require('express');
+const path      = require('path');
+const rateLimit = require('express-rate-limit');
 
 const app    = express();
-const PORT   = 3000;
+const PORT   = process.env.PORT || 3000;
 const APIKEY = process.env.ANTHROPIC_API_KEY;
 
 if (!APIKEY) {
@@ -12,6 +13,15 @@ if (!APIKEY) {
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
+
+// Max 30 API calls per IP per hour
+app.use('/api/chat', rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: 'Too many requests — please try again in an hour.' } },
+}));
 
 app.post('/api/chat', async (req, res) => {
   try {
