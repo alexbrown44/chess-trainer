@@ -287,6 +287,10 @@ function Setup({ onStart, onHistory, onLeaderboard, defaultName }) {
         <p style={{...S.serif(15,400,'#7a7060'), fontStyle:'italic'}}>Play on your board. Report your moves. Receive expert coaching.</p>
       </header>
 
+      <div style={{marginBottom:16}}>
+        <HowToPlay />
+      </div>
+
       <div style={{...S.card(), display:'flex', flexDirection:'column', gap:26}}>
 
         {/* Player Name */}
@@ -338,9 +342,6 @@ function Setup({ onStart, onHistory, onLeaderboard, defaultName }) {
         <button onClick={()=>onStart({level,color,moveCount,playerName})} style={S.goldBtn()}>
           ♟ &nbsp;Start Game
         </button>
-
-        {/* How to Play */}
-        <HowToPlay />
 
         <div style={{display:'flex', gap:10}}>
           <button onClick={()=>onHistory(playerName)} disabled={!playerName.trim()}
