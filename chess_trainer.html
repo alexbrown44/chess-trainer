@@ -282,11 +282,11 @@ function Setup({ onStart, onHistory, onLeaderboard, defaultName }) {
 
         <div style={{display:'flex', gap:10}}>
           <button onClick={()=>onHistory(playerName)} disabled={!playerName.trim()}
-            style={{...S.restartBtn, flex:1, padding:'11px', fontSize:13, opacity: playerName.trim() ? 1 : 0.4}}>
+            style={{flex:1, padding:'12px', fontSize:14, fontWeight:600, fontFamily:"'Playfair Display',serif", borderRadius:8, border:'1px solid rgba(212,175,55,0.5)', background:'#0e0e0e', color: playerName.trim() ? '#d4af37' : '#4a4030', cursor: playerName.trim() ? 'pointer' : 'default', letterSpacing:'0.03em', transition:'all 0.15s'}}>
             ♟ My Games
           </button>
           <button onClick={onLeaderboard}
-            style={{...S.restartBtn, flex:1, padding:'11px', fontSize:13}}>
+            style={{flex:1, padding:'12px', fontSize:14, fontWeight:600, fontFamily:"'Playfair Display',serif", borderRadius:8, border:'1px solid rgba(212,175,55,0.5)', background:'#0e0e0e', color:'#d4af37', cursor:'pointer', letterSpacing:'0.03em', transition:'all 0.15s'}}>
             ♛ Leaderboard
           </button>
         </div>
