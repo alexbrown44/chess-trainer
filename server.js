@@ -13,10 +13,17 @@ if (!APIKEY) {
 }
 
 const pool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    })
   : null;
 
-if (!pool) console.warn('Warning: DATABASE_URL not set — game history disabled.');
+if (!pool) {
+  console.warn('Warning: DATABASE_URL not set — game history disabled.');
+} else {
+  pool.query('SELECT 1').then(() => console.log('Database connected.')).catch(e => console.error('Database connection failed:', e.message));
+}
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
