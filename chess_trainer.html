@@ -214,10 +214,11 @@ function Loading({ msg }) {
   );
 }
 
-function Setup({ onStart }) {
-  const [level,     setLevel] = useState('intermediate');
-  const [color,     setColor] = useState('white');
-  const [moveCount, setCount] = useState(10);
+function Setup({ onStart, onHistory, onLeaderboard, defaultName }) {
+  const [level,      setLevel] = useState('intermediate');
+  const [color,      setColor] = useState('white');
+  const [moveCount,  setCount] = useState(10);
+  const [playerName, setName]  = useState(defaultName || '');
 
   return (
     <div style={S.page} className="fadein">
@@ -228,6 +229,16 @@ function Setup({ onStart }) {
       </header>
 
       <div style={{...S.card(), display:'flex', flexDirection:'column', gap:26}}>
+
+        {/* Player Name */}
+        <div style={S.formGroup}>
+          <label style={S.serif(15)}>Your Name</label>
+          <input
+            type="text" value={playerName} onChange={e=>setName(e.target.value)}
+            placeholder="Enter your name"
+            style={{background:'#0a0a0a', border:'1px solid #2a2a2a', borderRadius:8, padding:'13px 16px', color:'#e0d8c8', fontSize:15, fontFamily:"'JetBrains Mono',monospace"}}
+          />
+        </div>
 
         {/* Skill Level */}
         <div style={S.formGroup}>
@@ -265,9 +276,20 @@ function Setup({ onStart }) {
           <div style={S.sliderRow}>{[5,6,7,8,9,10].map(n=><span key={n}>{n}</span>)}</div>
         </div>
 
-        <button onClick={()=>onStart({level,color,moveCount})} style={S.goldBtn()}>
+        <button onClick={()=>onStart({level,color,moveCount,playerName})} style={S.goldBtn()}>
           ♟ &nbsp;Start Game
         </button>
+
+        <div style={{display:'flex', gap:10}}>
+          <button onClick={()=>onHistory(playerName)} disabled={!playerName.trim()}
+            style={{...S.restartBtn, flex:1, padding:'11px', fontSize:13, opacity: playerName.trim() ? 1 : 0.4}}>
+            ♟ My Games
+          </button>
+          <button onClick={onLeaderboard}
+            style={{...S.restartBtn, flex:1, padding:'11px', fontSize:13}}>
+            ♛ Leaderboard
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -484,10 +506,129 @@ function Report({ report, moves, settings, onNewGame }) {
   );
 }
 
+// ── History ───────────────────────────────────────────────────────────────────
+
+function History({ playerName, onBack }) {
+  const [games,    setGames]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [expanded, setExpanded] = useState(null);
+  const [err,      setErr]      = useState('');
+
+  useEffect(() => {
+    fetch(`/api/games?player=${encodeURIComponent(playerName)}`)
+      .then(r => r.json())
+      .then(d => { setGames(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(e => { setErr(e.message); setLoading(false); });
+  }, [playerName]);
+
+  if (loading) return <Loading msg="Loading your games" />;
+
+  return (
+    <div style={S.page} className="fadein">
+      <header style={S.header}>
+        <div style={S.decoRow}>{DECO.slice(0,6).map((p,i)=><span key={i} style={S.decoPiece}>{p}</span>)}</div>
+        <h1 style={{...S.serif('clamp(26px,4vw,42px)',700,'#d4af37'), marginBottom:8}}>My Games</h1>
+        <p style={S.mono(12,'#6a6050')}>{playerName}</p>
+      </header>
+      {err && <p style={{color:'#aa3333', marginBottom:16, fontFamily:"'JetBrains Mono',monospace", fontSize:13}}>{err}</p>}
+      {games.length === 0
+        ? <div style={{...S.card(), textAlign:'center', padding:'40px'}}>
+            <p style={S.mono(13,'#4a4030')}>No games recorded yet for "{playerName}".</p>
+          </div>
+        : games.map((g, i) => (
+            <div key={g.id} style={{...S.card({marginBottom:12})}}>
+              <div onClick={()=>setExpanded(expanded===i ? null : i)}
+                style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8, cursor:'pointer'}}>
+                <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+                  <span style={S.badge}>{new Date(g.played_at).toLocaleDateString()}</span>
+                  <span style={S.badge}>{g.skill_level}</span>
+                  <span style={S.badge}>{g.player_color}</span>
+                  {g.opening_name && <span style={S.badge}>{g.opening_name}</span>}
+                </div>
+                <span style={S.serif(20,700, g.score >= 70 ? '#d4af37' : g.score >= 50 ? '#c8a030' : '#8a7050')}>
+                  {g.score !== null ? `${g.score}/100` : '—'}
+                </span>
+              </div>
+              {expanded === i && g.coaching_report && (
+                <div style={{marginTop:16, borderTop:'1px solid #1e1e1e', paddingTop:16}}>
+                  {renderReport(g.coaching_report)}
+                </div>
+              )}
+            </div>
+          ))
+      }
+      <div style={{display:'flex', justifyContent:'center', paddingTop:8, paddingBottom:20}}>
+        <button onClick={onBack} style={S.goldBtn()}>← Back to Setup</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+
+function Leaderboard({ onBack }) {
+  const [rows,    setRows]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err,     setErr]     = useState('');
+
+  useEffect(() => {
+    fetch('/api/games/leaderboard')
+      .then(r => r.json())
+      .then(d => { setRows(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(e => { setErr(e.message); setLoading(false); });
+  }, []);
+
+  if (loading) return <Loading msg="Loading leaderboard" />;
+
+  return (
+    <div style={S.page} className="fadein">
+      <header style={S.header}>
+        <div style={S.decoRow}>{DECO.slice(6).map((p,i)=><span key={i} style={S.decoPiece}>{p}</span>)}</div>
+        <h1 style={{...S.serif('clamp(26px,4vw,42px)',700,'#d4af37'), marginBottom:8}}>Leaderboard</h1>
+        <p style={S.mono(12,'#6a6050')}>Ranked by average score</p>
+      </header>
+      {err && <p style={{color:'#aa3333', marginBottom:16, fontFamily:"'JetBrains Mono',monospace", fontSize:13}}>{err}</p>}
+      {rows.length === 0
+        ? <div style={{...S.card(), textAlign:'center', padding:'40px'}}>
+            <p style={S.mono(13,'#4a4030')}>No games recorded yet. Be the first on the board!</p>
+          </div>
+        : <div style={S.card()}>
+            <table style={{width:'100%', borderCollapse:'collapse'}}>
+              <thead>
+                <tr>
+                  <th style={S.th}>#</th>
+                  <th style={S.th}>Player</th>
+                  <th style={S.th}>Games</th>
+                  <th style={S.th}>Avg Score</th>
+                  <th style={S.th}>Best</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={r.player_name} style={{borderBottom:'1px solid #181818'}}>
+                    <td style={{...S.tdN, color: i===0 ? '#d4af37' : '#3a3530'}}>{i+1}.</td>
+                    <td style={{...S.tdM(i===0), padding:'10px 10px'}}>{r.player_name}</td>
+                    <td style={{...S.mono(13,'#6a6050'), padding:'10px 6px'}}>{r.games_played}</td>
+                    <td style={{...S.serif(16,700, i===0 ? '#d4af37' : '#9a8060'), padding:'10px 6px'}}>{r.avg_score}</td>
+                    <td style={{...S.mono(12,'#5a5040'), padding:'10px 6px'}}>{r.best_score}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+      }
+      <div style={{display:'flex', justifyContent:'center', paddingTop:20, paddingBottom:20}}>
+        <button onClick={onBack} style={S.goldBtn()}>← Back to Setup</button>
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
   const [phase,           setPhase]           = useState('setup');
+  const [playerName,      setPlayerName]      = useState('');
   const [settings,        setSettings]        = useState(null);
   const [moves,           setMoves]           = useState([]);
   const [error,           setError]           = useState('');
@@ -518,6 +659,43 @@ function App() {
     setChallengeResult(null);
     setIllegalMove(null);
     chessRef.current = new Chess();
+  }
+
+  async function saveGame(finalMoves, reportText) {
+    try {
+      const scoreSection = reportText.match(/Performance Score[\s\S]{0,300}/i);
+      let score = null;
+      if (scoreSection) {
+        const nums = scoreSection[0].match(/\b([1-9][0-9]?|100)\b/g);
+        if (nums) score = parseInt(nums[0]);
+      }
+      const openingSection = reportText.match(/Opening Strategy Assessment([\s\S]{0,600})/i);
+      let opening_name = null;
+      if (openingSection) {
+        const bold = openingSection[1].match(/\*\*([^*]{5,50})\*\*/);
+        if (bold) opening_name = bold[1];
+        else {
+          const named = openingSection[1].match(/\b([A-Z][a-zA-Z\s]{3,35}(?:Opening|Defense|Defence|Gambit|Attack|Game|System))\b/);
+          if (named) opening_name = named[1].trim();
+        }
+      }
+      await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          player_name:     settings.playerName || 'Anonymous',
+          skill_level:     LEVELS[settings.level].label,
+          player_color:    settings.color,
+          move_count:      finalMoves.length,
+          moves:           formatPGN(finalMoves),
+          score,
+          opening_name,
+          coaching_report: reportText,
+        }),
+      });
+    } catch (e) {
+      console.error('Failed to save game:', e);
+    }
   }
 
   async function handleChallenge(userExplanation) {
@@ -594,6 +772,7 @@ function App() {
   }
 
   async function handleStart(cfg) {
+    setPlayerName(cfg.playerName || '');
     setSettings(cfg);
     setMoves([]);
     setError('');
@@ -751,6 +930,7 @@ function App() {
     try {
       const txt = await callClaude(system, userMsg, 4096);
       setReport(txt);
+      saveGame(finalMoves, txt);
       setPhase('report');
     } catch(e) {
       setError(e.message);
@@ -758,7 +938,9 @@ function App() {
     }
   }
 
-  if (phase === 'setup')                             return <Setup onStart={handleStart} />;
+  if (phase === 'history')     return <History playerName={playerName} onBack={()=>setPhase('setup')} />;
+  if (phase === 'leaderboard') return <Leaderboard onBack={()=>setPhase('setup')} />;
+  if (phase === 'setup')       return <Setup onStart={handleStart} defaultName={playerName} onHistory={name=>{setPlayerName(name);setPhase('history');}} onLeaderboard={()=>setPhase('leaderboard')} />;
   if (phase === 'loading' || phase === 'generating') return <Loading msg={loadMsg} />;
   if (phase === 'playing')                           return <Game moves={moves} settings={settings} onMove={handleMove} error={error} onRestart={handleRestart} onChallenge={handleChallenge} challengeResult={challengeResult} illegalMove={illegalMove} onChallengeRuling={handleChallengeRuling} />;
   if (phase === 'report')                            return <Report report={report} moves={moves} settings={settings} onNewGame={()=>setPhase('setup')} />;
