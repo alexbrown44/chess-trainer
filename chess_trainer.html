@@ -215,6 +215,64 @@ function Loading({ msg }) {
   );
 }
 
+function HowToPlay() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{border:'1px solid #222', borderRadius:9, overflow:'hidden'}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{width:'100%', background:'#0e0e0e', border:'none', padding:'13px 18px', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer'}}>
+        <span style={S.serif(14,600,'#9a8060')}>How to Play</span>
+        <span style={{color:'#6a6050', fontSize:16, fontFamily:"'JetBrains Mono',monospace"}}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{background:'#0a0a0a', padding:'18px 20px', display:'flex', flexDirection:'column', gap:16}}>
+
+          <div>
+            <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>The setup</p>
+            <p style={S.mono(12,'#7a7060')}>Play on your physical chess board. Enter your moves into the app and the coach will reply with the opponent's move. Make that move on your board and continue.</p>
+          </div>
+
+          <div>
+            <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>How to enter a move</p>
+            <p style={{...S.mono(12,'#7a7060'), marginBottom:10}}>Use Standard Algebraic Notation (SAN). The piece letter followed by the destination square:</p>
+            <table style={{width:'100%', borderCollapse:'collapse'}}>
+              <tbody>
+                {[
+                  ['e4',    'Pawn to e4 (no letter for pawns)'],
+                  ['Nf3',   'Knight to f3'],
+                  ['Bb5',   'Bishop to b5'],
+                  ['Qd4',   'Queen to d4'],
+                  ['O-O',   'Castle kingside'],
+                  ['O-O-O', 'Castle queenside'],
+                  ['exd5',  'Pawn on e-file captures on d5'],
+                  ['Nxe5',  'Knight captures on e5'],
+                ].map(([move, desc]) => (
+                  <tr key={move} style={{borderBottom:'1px solid #181818'}}>
+                    <td style={{...S.mono(13,'#d4af37'), padding:'6px 12px 6px 0', width:80, fontWeight:600}}>{move}</td>
+                    <td style={S.mono(12,'#6a6050')}>{desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>Challenging a move</p>
+            <p style={S.mono(12,'#7a7060')}>If the opponent plays a move that looks wrong, click <span style={{color:'#a08830'}}>⚑ Challenge Move</span> and explain why. The coach will verify the position using the real board state.</p>
+            <p style={{...S.mono(12,'#7a7060'), marginTop:8}}>If the app flags your move as illegal and you disagree, click <span style={{color:'#aa6060'}}>⚑ Challenge this ruling</span> and explain your reasoning.</p>
+          </div>
+
+          <div>
+            <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>The coaching report</p>
+            <p style={S.mono(12,'#7a7060')}>After the set number of moves, the coach analyses every move you made, identifies the opening played, highlights key mistakes, and gives you a performance score from 1–100. Your score and game are saved automatically.</p>
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Setup({ onStart, onHistory, onLeaderboard, defaultName }) {
   const [level,      setLevel] = useState('intermediate');
   const [color,      setColor] = useState('white');
@@ -280,6 +338,9 @@ function Setup({ onStart, onHistory, onLeaderboard, defaultName }) {
         <button onClick={()=>onStart({level,color,moveCount,playerName})} style={S.goldBtn()}>
           ♟ &nbsp;Start Game
         </button>
+
+        {/* How to Play */}
+        <HowToPlay />
 
         <div style={{display:'flex', gap:10}}>
           <button onClick={()=>onHistory(playerName)} disabled={!playerName.trim()}
