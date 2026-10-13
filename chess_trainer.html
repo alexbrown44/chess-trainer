@@ -229,12 +229,12 @@ function HowToPlay() {
 
           <div>
             <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>The setup</p>
-            <p style={S.mono(12,'#7a7060')}>Play on your physical chess board. Enter your moves into the app and the coach will reply with the opponent's move. Make that move on your board and continue.</p>
+            <p style={S.mono(12,'#e8e0d0')}>Play on your physical chess board. Enter your moves into the app and the coach will reply with the opponent's move. Make that move on your board and continue.</p>
           </div>
 
           <div>
             <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>How to enter a move</p>
-            <p style={{...S.mono(12,'#7a7060'), marginBottom:10}}>Use Standard Algebraic Notation (SAN). The piece letter followed by the destination square:</p>
+            <p style={{...S.mono(12,'#e8e0d0'), marginBottom:10}}>Use Standard Algebraic Notation (SAN). The piece letter followed by the destination square:</p>
             <table style={{width:'100%', borderCollapse:'collapse'}}>
               <tbody>
                 {[
@@ -249,7 +249,7 @@ function HowToPlay() {
                 ].map(([move, desc]) => (
                   <tr key={move} style={{borderBottom:'1px solid #181818'}}>
                     <td style={{...S.mono(13,'#d4af37'), padding:'6px 12px 6px 0', width:80, fontWeight:600}}>{move}</td>
-                    <td style={S.mono(12,'#6a6050')}>{desc}</td>
+                    <td style={S.mono(12,'#e8e0d0')}>{desc}</td>
                   </tr>
                 ))}
               </tbody>
@@ -258,13 +258,13 @@ function HowToPlay() {
 
           <div>
             <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>Challenging a move</p>
-            <p style={S.mono(12,'#7a7060')}>If the opponent plays a move that looks wrong, click <span style={{color:'#a08830'}}>⚑ Challenge Move</span> and explain why. The coach will verify the position using the real board state.</p>
-            <p style={{...S.mono(12,'#7a7060'), marginTop:8}}>If the app flags your move as illegal and you disagree, click <span style={{color:'#aa6060'}}>⚑ Challenge this ruling</span> and explain your reasoning.</p>
+            <p style={S.mono(12,'#e8e0d0')}>If the opponent plays a move that looks wrong, click <span style={{color:'#d4af37'}}>⚑ Challenge Move</span> and explain why. The coach will verify the position using the real board state.</p>
+            <p style={{...S.mono(12,'#e8e0d0'), marginTop:8}}>If the app flags your move as illegal and you disagree, click <span style={{color:'#e08080'}}>⚑ Challenge this ruling</span> and explain your reasoning.</p>
           </div>
 
           <div>
             <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>The coaching report</p>
-            <p style={S.mono(12,'#7a7060')}>After the set number of moves, the coach analyses every move you made, identifies the opening played, highlights key mistakes, and gives you a performance score from 1–100. Your score and game are saved automatically.</p>
+            <p style={S.mono(12,'#e8e0d0')}>After the set number of moves, the coach analyses every move you made, identifies the opening played, highlights key mistakes, and gives you a performance score from 1–100. Your score and game are saved automatically.</p>
           </div>
 
         </div>
