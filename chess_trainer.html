@@ -141,7 +141,7 @@ const S = {
   }),
 
   gameBar: { display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10, marginBottom:22 },
-  badge:   { background:'#111', border:'1px solid #222', borderRadius:20, padding:'4px 13px', fontSize:11, color:'#7a7060', fontFamily:"'JetBrains Mono',monospace" },
+  badge:   { background:'#111', border:'1px solid #333', borderRadius:20, padding:'4px 13px', fontSize:11, color:'#e8e0d0', fontFamily:"'JetBrains Mono',monospace" },
 
   th:  { textAlign:'left', color:'#3a3530', fontSize:10, textTransform:'uppercase', letterSpacing:'0.1em', paddingBottom:8, borderBottom:'1px solid #1e1e1e' },
   tdN: { color:'#2e2e2e', padding:'5px 6px 5px 0', width:28, fontFamily:"'JetBrains Mono',monospace", fontSize:13 },
@@ -735,8 +735,9 @@ function App() {
       const openingSection = reportText.match(/Opening Strategy Assessment([\s\S]{0,600})/i);
       let opening_name = null;
       if (openingSection) {
-        const bold = openingSection[1].match(/\*\*([^*]{5,50})\*\*/);
-        if (bold) opening_name = bold[1];
+        const bolds = [...openingSection[1].matchAll(/\*\*([^*]{5,50})\*\*/g)];
+        const bold = bolds.find(m => !m[1].trim().endsWith(':'));
+        if (bold) opening_name = bold[1].trim();
         else {
           const named = openingSection[1].match(/\b([A-Z][a-zA-Z\s]{3,35}(?:Opening|Defense|Defence|Gambit|Attack|Game|System))\b/);
           if (named) opening_name = named[1].trim();
