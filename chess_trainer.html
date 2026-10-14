@@ -208,6 +208,7 @@ function parseReport(txt) {
     development:       get('DEVELOPMENT'),
     kingSafety:        get('KING_SAFETY'),
     takeaways:         bullets,
+    recommendations:   get('RECOMMENDATIONS'),
   };
 }
 
@@ -257,6 +258,13 @@ function ReportCard({ report, moves, settings }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {/* Recommendations */}
+      {r.recommendations && (
+        <div style={S.card()}>
+          <p style={{...S.mono(10,'#6a6050'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>Recommendations</p>
+          <p style={{...S.mono(12,'#e8e0d0'), lineHeight:1.7}}>{r.recommendations}</p>
         </div>
       )}
       {/* PGN */}
@@ -1044,12 +1052,13 @@ function App() {
       `KING_SAFETY: [good/ok/poor]\n` +
       `- [key takeaway 1 — one plain sentence, no markdown]\n` +
       `- [key takeaway 2 — one plain sentence, no markdown]\n` +
-      `- [key takeaway 3 — one plain sentence, no markdown]\n\n` +
+      `- [key takeaway 3 — one plain sentence, no markdown]\n` +
+      `RECOMMENDATIONS: [2-3 sentences of study advice tailored to the player's skill level — what to practise next, what to focus on to improve]\n\n` +
       `Player colour: ${yourColor}\nSkill level: ${LEVELS[settings.level].label}\n` +
       `Full game: ${pgn}\nPlayer's moves: ${yourMoves}`;
 
     try {
-      const txt = await callClaude(system, userMsg, 500);
+      const txt = await callClaude(system, userMsg, 700);
       setReport(txt);
       saveGame(finalMoves, txt);
       setPhase('report');
