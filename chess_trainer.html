@@ -197,6 +197,77 @@ function renderReport(text) {
   });
 }
 
+function parseReport(txt) {
+  const get = (key) => { const m = txt.match(new RegExp(`^${key}:\\s*(.+)$`, 'im')); return m ? m[1].trim() : null; };
+  const bullets = [...txt.matchAll(/^[-•]\s+(.+)$/gm)].map(m => m[1].trim());
+  return {
+    score:             parseInt(get('SCORE')) || null,
+    opening:           get('OPENING'),
+    openingPrinciples: get('OPENING_PRINCIPLES'),
+    tactics:           get('TACTICS'),
+    development:       get('DEVELOPMENT'),
+    kingSafety:        get('KING_SAFETY'),
+    takeaways:         bullets,
+  };
+}
+
+function RatingDot({ rating }) {
+  const color = rating === 'good' ? '#22c55e' : rating === 'ok' ? '#f59e0b' : rating === 'poor' ? '#ef4444' : '#3a3530';
+  const label = rating ? rating.charAt(0).toUpperCase() + rating.slice(1) : '—';
+  return <span style={{display:'inline-flex', alignItems:'center', gap:6}}>
+    <span style={{width:10, height:10, borderRadius:'50%', background:color, display:'inline-block', flexShrink:0}} />
+    <span style={{...S.mono(12, color), fontWeight:600}}>{label}</span>
+  </span>;
+}
+
+function ReportCard({ report, moves, settings }) {
+  const r = parseReport(report);
+  const scoreColor = r.score >= 70 ? '#d4af37' : r.score >= 50 ? '#c8a030' : '#c87070';
+  const rows = [
+    ['Opening principles', r.openingPrinciples],
+    ['Tactics',            r.tactics],
+    ['Piece development',  r.development],
+    ['King safety',        r.kingSafety],
+  ];
+  return (
+    <div style={{display:'flex', flexDirection:'column', gap:16}}>
+      {/* Score + opening */}
+      <div style={{...S.card({padding:'24px 20px'}), textAlign:'center'}}>
+        <div style={S.serif('clamp(52px,10vw,72px)', 700, scoreColor)}>{r.score ?? '—'}<span style={{...S.mono(16,'#6a6050'), fontWeight:400}}>/100</span></div>
+        {r.opening && <div style={{...S.mono(13,'#e8e0d0'), marginTop:6}}>{r.opening}</div>}
+      </div>
+      {/* Traffic lights */}
+      <div style={S.card()}>
+        {rows.map(([label, val], i) => (
+          <div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom: i < rows.length-1 ? '1px solid #1a1a1a' : 'none'}}>
+            <span style={S.mono(12,'#e8e0d0')}>{label}</span>
+            <RatingDot rating={val} />
+          </div>
+        ))}
+      </div>
+      {/* Takeaways */}
+      {r.takeaways.length > 0 && (
+        <div style={S.card()}>
+          <p style={{...S.mono(10,'#6a6050'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:12}}>Key takeaways</p>
+          <div style={{display:'flex', flexDirection:'column', gap:10}}>
+            {r.takeaways.map((t,i) => (
+              <div key={i} style={{display:'flex', gap:10, alignItems:'flex-start'}}>
+                <span style={{color:'#d4af37', flexShrink:0, marginTop:1}}>▸</span>
+                <span style={S.mono(12,'#e8e0d0')}>{t}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* PGN */}
+      <div style={{...S.card({padding:'14px 20px'})}}>
+        <p style={{...S.mono(10,'#3a3530'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8}}>Game record</p>
+        <p style={{...S.mono(12,'#6a6050'), lineHeight:1.7, wordBreak:'break-all'}}>{formatPGN(moves)}</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Components ────────────────────────────────────────────────────────────────
 
 function Loading({ msg }) {
@@ -553,21 +624,14 @@ function Report({ report, moves, settings, onNewGame }) {
       <header style={S.header}>
         <div style={S.decoRow}>{DECO.slice(6).map((p,i)=><span key={i} style={S.decoPiece}>{p}</span>)}</div>
         <h1 style={{...S.serif('clamp(26px,4vw,42px)',700,'#d4af37'), letterSpacing:'0.02em', marginBottom:8}}>Coaching Report</h1>
-        <p style={S.mono(12,'#6a6050')}>
+        <p style={S.mono(12,'#e8e0d0')}>
           {LEVELS[settings.level].label} &nbsp;·&nbsp; {settings.color==='white'?'White':'Black'} &nbsp;·&nbsp; {settings.moveCount} moves
         </p>
       </header>
 
-      {/* PGN */}
-      <div style={{...S.card({padding:'16px 20px', marginBottom:18})}}>
-        <p style={{...S.mono(10,'#3a3530'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>Game Record</p>
-        <p style={{...S.mono(13,'#7a7060'), lineHeight:1.7, wordBreak:'break-all'}}>{formatPGN(moves)}</p>
-      </div>
+      <ReportCard report={report} moves={moves} settings={settings} />
 
-      {/* Report body */}
-      <div style={S.reportCard}>{renderReport(report)}</div>
-
-      <div style={{display:'flex', justifyContent:'center', paddingBottom:20}}>
+      <div style={{display:'flex', justifyContent:'center', paddingTop:8, paddingBottom:20}}>
         <button onClick={onNewGame} style={S.goldBtn()}>♟ &nbsp;New Game</button>
       </div>
     </div>
@@ -731,23 +795,9 @@ function App() {
 
   async function saveGame(finalMoves, reportText) {
     try {
-      const scoreSection = reportText.match(/Performance Score[\s\S]{0,300}/i);
-      let score = null;
-      if (scoreSection) {
-        const nums = scoreSection[0].match(/\b([1-9][0-9]?|100)\b/g);
-        if (nums) score = parseInt(nums[0]);
-      }
-      const openingSection = reportText.match(/Opening Strategy Assessment([\s\S]{0,600})/i);
-      let opening_name = null;
-      if (openingSection) {
-        const bolds = [...openingSection[1].matchAll(/\*\*([^*]{5,50})\*\*/g)];
-        const bold = bolds.find(m => !m[1].trim().endsWith(':'));
-        if (bold) opening_name = bold[1].trim();
-        else {
-          const named = openingSection[1].match(/\b([A-Z][a-zA-Z\s]{3,35}(?:Opening|Defense|Defence|Gambit|Attack|Game|System))\b/);
-          if (named) opening_name = named[1].trim();
-        }
-      }
+      const parsed = parseReport(reportText);
+      const score        = parsed.score;
+      const opening_name = parsed.opening;
       await fetch('/api/games', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -981,25 +1031,25 @@ function App() {
       : finalMoves.filter(m=>m.b).map((m,i) => `${i+1}... ${m.b}`).join('  ');
 
     const system =
-      `You are a world-class chess coach providing detailed post-game opening analysis. ` +
-      `Write as a personal, experienced coach giving thorough written feedback. ` +
-      `Be specific about chess principles, naming openings and ideas where appropriate. ` +
-      `Calibrate your language and depth to the player's stated skill level.`;
+      `You are a chess coach giving concise post-game feedback. ` +
+      `Respond ONLY in the exact structured format requested — no extra prose, no markdown.`;
 
     const userMsg =
-      `Please write a coaching report for this chess opening.\n\n` +
+      `Analyse this chess opening and respond in EXACTLY this format (no other text):\n\n` +
+      `SCORE: [1-100]\n` +
+      `OPENING: [name of the opening played, e.g. Italian Game]\n` +
+      `OPENING_PRINCIPLES: [good/ok/poor]\n` +
+      `TACTICS: [good/ok/poor]\n` +
+      `DEVELOPMENT: [good/ok/poor]\n` +
+      `KING_SAFETY: [good/ok/poor]\n` +
+      `- [key takeaway 1 — one plain sentence, no markdown]\n` +
+      `- [key takeaway 2 — one plain sentence, no markdown]\n` +
+      `- [key takeaway 3 — one plain sentence, no markdown]\n\n` +
       `Player colour: ${yourColor}\nSkill level: ${LEVELS[settings.level].label}\n` +
-      `Full game: ${pgn}\nPlayer's moves: ${yourMoves}\n\n` +
-      `Structure your report with these sections:\n` +
-      `## Move-by-Move Analysis\nComment on each of the player's moves — what principles were applied or violated, alternatives worth knowing.\n\n` +
-      `## Opening Strategy Assessment\nOverall evaluation: did they follow sound opening principles? Which opening was played?\n\n` +
-      `## Key Mistakes & Missed Opportunities\nThe most important moments where a better choice was available.\n\n` +
-      `## Improvement Recommendations\nConcrete, level-appropriate study advice and ideas to work on.\n\n` +
-      `## Performance Score\nRate the player 1–100 and explain the score in 2–3 sentences.\n\n` +
-      `Write in an engaging personal coaching voice. Be honest and encouraging.`;
+      `Full game: ${pgn}\nPlayer's moves: ${yourMoves}`;
 
     try {
-      const txt = await callClaude(system, userMsg, 4096);
+      const txt = await callClaude(system, userMsg, 500);
       setReport(txt);
       saveGame(finalMoves, txt);
       setPhase('report');
