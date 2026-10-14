@@ -921,25 +921,35 @@ function App() {
 
   // Shared logic for after a user move has been validated by chess.js
   async function playValidatedMove(san) {
+    const chess = chessRef.current;
+
     if (settings.color === 'white') {
       const nm = [...moves, { w: san, b: '' }];
       setMoves(nm);
+      // End immediately on checkmate / stalemate / draw after player's move
+      if (chess.game_over()) { await generateReport(nm); return; }
       if (nm.length >= settings.moveCount) { await generateReport(nm); return; }
       setLoadMsg("Opponent is thinking…"); setPhase('loading');
       try {
         const mv = await opponentMove(nm, 'Black', settings.level);
-        setMoves(nm.map((m,i) => i === nm.length-1 ? {...m, b: mv} : m));
+        const updated = nm.map((m,i) => i === nm.length-1 ? {...m, b: mv} : m);
+        setMoves(updated);
+        if (chess.game_over()) { await generateReport(updated); return; }
         setPhase('playing');
       } catch(e) { setError(e.message); setPhase('playing'); }
     } else {
       const nm = moves.map((m,i) => i === moves.length-1 ? {...m, b: san} : m);
       setMoves(nm);
+      // End immediately on checkmate / stalemate / draw after player's move
+      if (chess.game_over()) { await generateReport(nm); return; }
       const userCount = nm.filter(m => m.b).length;
       if (userCount >= settings.moveCount) { await generateReport(nm); return; }
       setLoadMsg("Opponent is thinking…"); setPhase('loading');
       try {
         const mv = await opponentMove(nm, 'White', settings.level);
-        setMoves([...nm, { w: mv, b: '' }]);
+        const updated = [...nm, { w: mv, b: '' }];
+        setMoves(updated);
+        if (chess.game_over()) { await generateReport(updated); return; }
         setPhase('playing');
       } catch(e) { setError(e.message); setPhase('playing'); }
     }
