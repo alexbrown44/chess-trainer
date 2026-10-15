@@ -706,27 +706,33 @@ function History({ playerName, onBack }) {
         ? <div style={{...S.card(), textAlign:'center', padding:'40px'}}>
             <p style={S.mono(13,'#e8e0d0')}>No games recorded yet for "{playerName}".</p>
           </div>
-        : games.map((g, i) => (
-            <div key={g.id} style={{...S.card({marginBottom:12})}}>
-              <div onClick={()=>setExpanded(expanded===i ? null : i)}
-                style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8, cursor:'pointer'}}>
-                <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-                  <span style={S.badge}>{new Date(g.played_at).toLocaleDateString()}</span>
-                  <span style={S.badge}>{g.skill_level}</span>
-                  <span style={S.badge}>{g.player_color}</span>
-                  {g.opening_name && <span style={S.badge}>{g.opening_name}</span>}
+        : <div style={S.card({padding:0, overflow:'hidden'})}>
+            {games.map((g, i) => {
+              const scoreColor = g.score >= 70 ? '#d4af37' : g.score >= 50 ? '#c8a030' : '#c87070';
+              const date = new Date(g.played_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+              return (
+                <div key={g.id} style={{borderBottom: i < games.length-1 ? '1px solid #181818' : 'none'}}>
+                  <div onClick={()=>setExpanded(expanded===i ? null : i)}
+                    style={{display:'flex', alignItems:'center', gap:10, padding:'9px 16px', cursor:'pointer', userSelect:'none'}}>
+                    <span style={S.mono(11,'#6a6050')}>{date}</span>
+                    <span style={{...S.mono(11,'#e8e0d0'), flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                      {g.opening_name || g.skill_level}
+                    </span>
+                    <span style={S.mono(11,'#6a6050')}>{g.player_color === 'white' ? '♔' : '♚'}</span>
+                    <span style={{...S.serif(14,700,scoreColor), minWidth:44, textAlign:'right'}}>
+                      {g.score !== null ? `${g.score}` : '—'}
+                    </span>
+                    <span style={{color:'#3a3530', fontSize:10}}>{expanded===i ? '▲' : '▼'}</span>
+                  </div>
+                  {expanded === i && g.coaching_report && (
+                    <div style={{padding:'14px 16px 16px', borderTop:'1px solid #1a1a1a', background:'#080808'}}>
+                      <ReportCard report={g.coaching_report} moves={[]} settings={{level:g.skill_level,color:g.player_color,moveCount:g.move_count}} />
+                    </div>
+                  )}
                 </div>
-                <span style={S.serif(20,700, g.score >= 70 ? '#d4af37' : g.score >= 50 ? '#c8a030' : '#8a7050')}>
-                  {g.score !== null ? `${g.score}/100` : '—'}
-                </span>
-              </div>
-              {expanded === i && g.coaching_report && (
-                <div style={{marginTop:16, borderTop:'1px solid #1e1e1e', paddingTop:16}}>
-                  {renderReport(g.coaching_report)}
-                </div>
-              )}
-            </div>
-          ))
+              );
+            })}
+          </div>
       }
       <div style={{display:'flex', justifyContent:'center', paddingTop:8, paddingBottom:20}}>
         <button onClick={onBack} style={S.goldBtn()}>← Back to Setup</button>
