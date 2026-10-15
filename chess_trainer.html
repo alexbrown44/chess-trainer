@@ -418,9 +418,10 @@ function Setup({ onStart, onHistory, onLeaderboard, defaultName }) {
           <label style={S.serif(15)}>Moves to Play</label>
           <div style={{display:'flex', gap:10, marginTop:6}}>
             {[
+              [5,  'Quick game'],
               [10, 'Opening focus'],
-              [20, 'Into the middlegame'],
-              [30, 'Extended game'],
+              [20, 'Middlegame'],
+              [30, 'Extended'],
             ].map(([n, desc]) => (
               <button key={n} onClick={()=>setCount(n)} style={{
                 flex:1, padding:'10px 6px', borderRadius:8, cursor:'pointer',
