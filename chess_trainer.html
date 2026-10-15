@@ -415,12 +415,24 @@ function Setup({ onStart, onHistory, onLeaderboard, defaultName }) {
 
         {/* Move Count */}
         <div style={S.formGroup}>
-          <label style={S.serif(15)}>
-            Moves to Play —&nbsp;<span style={{color:'#d4af37'}}>{moveCount}</span>
-          </label>
-          <input type="range" min="5" max="10" value={moveCount}
-            onChange={e=>setCount(Number(e.target.value))} style={S.slider} />
-          <div style={S.sliderRow}>{[5,6,7,8,9,10].map(n=><span key={n}>{n}</span>)}</div>
+          <label style={S.serif(15)}>Moves to Play</label>
+          <div style={{display:'flex', gap:10, marginTop:6}}>
+            {[
+              [10, 'Opening focus'],
+              [20, 'Into the middlegame'],
+              [30, 'Extended game'],
+            ].map(([n, desc]) => (
+              <button key={n} onClick={()=>setCount(n)} style={{
+                flex:1, padding:'10px 6px', borderRadius:8, cursor:'pointer',
+                border: moveCount===n ? '1.5px solid #d4af37' : '1.5px solid #2a2a2a',
+                background: moveCount===n ? '#1a1500' : '#111',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+              }}>
+                <span style={S.serif(20, 700, moveCount===n ? '#d4af37' : '#6a6050')}>{n}</span>
+                <span style={S.mono(10, moveCount===n ? '#c8a030' : '#4a4030')}>{desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <button onClick={()=>onStart({level,color,moveCount,playerName})} style={S.goldBtn()}>
