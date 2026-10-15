@@ -250,7 +250,7 @@ function ReportCard({ report, moves, settings }) {
       {/* Takeaways */}
       {r.takeaways.length > 0 && (
         <div style={S.card()}>
-          <p style={{...S.mono(10,'#6a6050'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:12}}>Key takeaways</p>
+          <p style={{...S.mono(11,'#d4af37'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:12}}>Key takeaways</p>
           <div style={{display:'flex', flexDirection:'column', gap:10}}>
             {r.takeaways.map((t,i) => (
               <div key={i} style={{display:'flex', gap:10, alignItems:'flex-start'}}>
@@ -264,14 +264,14 @@ function ReportCard({ report, moves, settings }) {
       {/* Recommendations */}
       {r.recommendations && (
         <div style={S.card()}>
-          <p style={{...S.mono(10,'#6a6050'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>Recommendations</p>
+          <p style={{...S.mono(11,'#d4af37'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>Recommendations</p>
           <p style={{...S.mono(12,'#e8e0d0'), lineHeight:1.7}}>{r.recommendations}</p>
         </div>
       )}
       {/* Trivia */}
       {r.trivia && (
         <div style={{...S.card(), borderLeft:'3px solid #d4af37'}}>
-          <p style={{...S.mono(10,'#6a6050'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>♟ Did you know?</p>
+          <p style={{...S.mono(11,'#d4af37'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>♟ Did you know?</p>
           <p style={{...S.mono(12,'#e8e0d0'), lineHeight:1.7, fontStyle:'italic'}}>{r.trivia}</p>
         </div>
       )}
