@@ -35,7 +35,7 @@ app.get('/', (req, res) => {
 // Max 30 API calls per IP per hour
 app.use('/api/chat', rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 30,
+  max: 150,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { message: 'Too many requests — please try again in an hour.' } },
