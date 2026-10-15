@@ -209,6 +209,7 @@ function parseReport(txt) {
     kingSafety:        get('KING_SAFETY'),
     takeaways:         bullets,
     recommendations:   get('RECOMMENDATIONS'),
+    trivia:            get('TRIVIA'),
   };
 }
 
@@ -265,6 +266,13 @@ function ReportCard({ report, moves, settings }) {
         <div style={S.card()}>
           <p style={{...S.mono(10,'#6a6050'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>Recommendations</p>
           <p style={{...S.mono(12,'#e8e0d0'), lineHeight:1.7}}>{r.recommendations}</p>
+        </div>
+      )}
+      {/* Trivia */}
+      {r.trivia && (
+        <div style={{...S.card(), borderLeft:'3px solid #d4af37'}}>
+          <p style={{...S.mono(10,'#6a6050'), textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10}}>♟ Did you know?</p>
+          <p style={{...S.mono(12,'#e8e0d0'), lineHeight:1.7, fontStyle:'italic'}}>{r.trivia}</p>
         </div>
       )}
       {/* PGN */}
@@ -1076,7 +1084,8 @@ function App() {
       `- [key takeaway 1 — one plain sentence, no markdown]\n` +
       `- [key takeaway 2 — one plain sentence, no markdown]\n` +
       `- [key takeaway 3 — one plain sentence, no markdown]\n` +
-      `RECOMMENDATIONS: [2-3 sentences of study advice tailored to the player's skill level — what to practise next, what to focus on to improve]\n\n` +
+      `RECOMMENDATIONS: [2-3 sentences of study advice tailored to the player's skill level — what to practise next, what to focus on to improve]\n` +
+      `TRIVIA: [one fascinating chess history or trivia fact, ideally connected to the opening or themes in this game — something surprising or delightful that a student would enjoy]\n\n` +
       `Player colour: ${yourColor}\nSkill level: ${LEVELS[settings.level].label}\n` +
       `Full game: ${pgn}\nPlayer's moves: ${yourMoves}`;
 
