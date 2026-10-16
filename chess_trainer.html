@@ -323,13 +323,16 @@ function HowToPlay() {
             <p style={{...S.serif(13,600,'#d4af37'), marginBottom:8}}>Board orientation</p>
             <p style={{...S.mono(12,'#e8e0d0'), marginBottom:10}}>White plays from the bottom, with the a-file on the left and the h-file on the right. If you're playing Black, sit at the other side of the board.</p>
             <pre style={{...S.mono(12,'#d4af37'), background:'#0d0d0d', border:'1px solid #222', borderRadius:6, padding:'10px 14px', lineHeight:1.8, overflowX:'auto'}}>
-{`   a  b  c  d  e  f  g  h
-8  ♜  ♞  ♝  ♛  ♚  ♝  ♞  ♜  ← Black
-7  ♟  ♟  ♟  ♟  ♟  ♟  ♟  ♟
-   ...
-2  ♙  ♙  ♙  ♙  ♙  ♙  ♙  ♙
-1  ♖  ♘  ♗  ♕  ♔  ♗  ♘  ♖  ← White
-   a  b  c  d  e  f  g  h`}
+{`  a b c d e f g h
+8 r n b q k b n r  ← Black
+7 p p p p p p p p
+  . . . . . . . .
+2 P P P P P P P P
+1 R N B Q K B N R  ← White
+  a b c d e f g h
+
+  Uppercase = White  |  r/R=Rook  n/N=Knight
+  Lowercase = Black  |  b/B=Bishop  q/Q=Queen  k/K=King  p/P=Pawn`}
             </pre>
           </div>
 
