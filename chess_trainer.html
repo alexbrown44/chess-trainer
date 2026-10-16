@@ -347,6 +347,10 @@ function HowToPlay() {
                   ['O-O-O', 'Castle queenside'],
                   ['exd5',  'Pawn on e-file captures on d5'],
                   ['Nxe5',  'Knight captures on e5'],
+                  ['Nf3+',  'Knight to f3, giving check'],
+                  ['Qh7#',  'Queen to h7, checkmate'],
+                  ['Nbd2',  'Knight on the b-file moves to d2 (distinguishes from the other knight)'],
+                  ['N1f3',  'Knight on rank 1 moves to f3 (use the rank number if files match)'],
                 ].map(([move, desc]) => (
                   <tr key={move} style={{borderBottom:'1px solid #181818'}}>
                     <td style={{...S.mono(13,'#d4af37'), padding:'6px 12px 6px 0', width:80, fontWeight:600}}>{move}</td>
